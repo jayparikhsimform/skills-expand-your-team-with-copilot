@@ -46,6 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Authentication state
   let currentUser = null;
+  let lastHighlightedSharedActivity = "";
   let currentTheme = "light";
 
   const THEME_STORAGE_KEY = "preferredTheme";
@@ -332,6 +333,120 @@ document.addEventListener("DOMContentLoaded", () => {
     return details.schedule;
   }
 
+  function createActivityHash(activityName) {
+    return `activity-${encodeURIComponent(activityName)}`;
+  }
+
+  function getSharedActivityFromHash() {
+    if (!window.location.hash.startsWith("#activity-")) {
+      return "";
+    }
+
+    try {
+      return decodeURIComponent(window.location.hash.replace(/^#activity-/, ""));
+    } catch (error) {
+      console.error("Invalid shared activity hash", error);
+      return "";
+    }
+  }
+
+  function buildShareUrl(activityName) {
+    const shareUrl = new URL(window.location.href);
+    shareUrl.hash = createActivityHash(activityName);
+    return shareUrl.toString();
+  }
+
+  function buildShareText(activityName, details) {
+    return [
+      `Check out ${activityName} at Mergington High School: ${formatSchedule(
+        details
+      )}.`,
+      details.description,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  function escapeHtmlAttribute(value) {
+    return String(value).replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+
+      return entities[character];
+    });
+  }
+
+  async function copyShareLink(activityName) {
+    const shareUrl = buildShareUrl(activityName);
+
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        throw new Error("Clipboard API unavailable");
+      }
+
+      await navigator.clipboard.writeText(shareUrl);
+      showMessage(`Share link copied for ${activityName}.`, "success");
+    } catch (error) {
+      console.error("Error copying share link:", error);
+      showMessage("Unable to copy the share link.", "error");
+    }
+  }
+
+  async function shareActivity(activityName, details) {
+    const shareData = {
+      title: `${activityName} | Mergington High School`,
+      text: buildShareText(activityName, details),
+      url: buildShareUrl(activityName),
+    };
+
+    if (!navigator.share) {
+      copyShareLink(activityName);
+      return;
+    }
+
+    try {
+      await navigator.share(shareData);
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        console.error("Error sharing activity:", error);
+        showMessage("Unable to share this activity right now.", "error");
+      }
+    }
+  }
+
+  function highlightSharedActivity() {
+    const sharedActivity = getSharedActivityFromHash();
+
+    if (!sharedActivity) {
+      lastHighlightedSharedActivity = "";
+      return;
+    }
+
+    if (sharedActivity === lastHighlightedSharedActivity) {
+      return;
+    }
+
+    const activityCard = document.getElementById(createActivityHash(sharedActivity));
+
+    if (!activityCard) {
+      return;
+    }
+
+    lastHighlightedSharedActivity = sharedActivity;
+
+    activityCard.classList.add("activity-card-highlight");
+    activityCard.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    setTimeout(() => {
+      activityCard.classList.remove("activity-card-highlight");
+    }, 2000);
+  }
+
   function isAllLevelsActivity(details) {
     return !details.difficulty;
   }
@@ -521,12 +636,15 @@ document.addEventListener("DOMContentLoaded", () => {
     Object.entries(filteredActivities).forEach(([name, details]) => {
       renderActivityCard(name, details);
     });
+
+    highlightSharedActivity();
   }
 
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
     activityCard.className = "activity-card";
+    activityCard.id = createActivityHash(name);
 
     // Calculate spots and capacity
     const totalSpots = details.max_participants;
@@ -549,6 +667,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Format the schedule using the new helper function
     const formattedSchedule = formatSchedule(details);
+    const shareUrl = buildShareUrl(name);
+    const shareText = buildShareText(name, details);
+    const escapedName = escapeHtmlAttribute(name);
 
     // Create activity tag
     const tagHtml = `
@@ -594,7 +715,9 @@ document.addEventListener("DOMContentLoaded", () => {
               ${
                 currentUser
                   ? `
-                <span class="delete-participant tooltip" data-activity="${name}" data-email="${email}">
+                <span class="delete-participant tooltip" data-activity="${escapedName}" data-email="${escapeHtmlAttribute(
+                    email
+                  )}">
                   ✖
                   <span class="tooltip-text">Unregister this student</span>
                 </span>
@@ -611,7 +734,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ${
           currentUser
             ? `
-          <button class="register-button" data-activity="${name}" ${
+          <button class="register-button" data-activity="${escapedName}" ${
                 isFull ? "disabled" : ""
               }>
             ${isFull ? "Activity Full" : "Register Student"}
@@ -623,6 +746,37 @@ document.addEventListener("DOMContentLoaded", () => {
           </div>
         `
         }
+      </div>
+      <div class="activity-card-share">
+        <span class="share-label">Share with friends:</span>
+        <div class="share-buttons">
+          <button class="share-button share-native-button" data-activity="${escapedName}" type="button">
+            Share
+          </button>
+          <a
+            class="share-button share-link"
+            href="https://twitter.com/intent/tweet?text=${encodeURIComponent(
+              shareText
+            )}&url=${encodeURIComponent(shareUrl)}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            X
+          </a>
+          <a
+            class="share-button share-link"
+            href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+              shareUrl
+            )}"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Facebook
+          </a>
+          <button class="share-button share-copy-button" data-activity="${escapedName}" type="button">
+            Copy Link
+          </button>
+        </div>
       </div>
     `;
 
@@ -641,6 +795,17 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    const shareButton = activityCard.querySelector(".share-native-button");
+    const copyButton = activityCard.querySelector(".share-copy-button");
+
+    shareButton.addEventListener("click", () => {
+      shareActivity(name, details);
+    });
+
+    copyButton.addEventListener("click", () => {
+      copyShareLink(name);
+    });
 
     activitiesList.appendChild(activityCard);
   }
@@ -932,6 +1097,8 @@ document.addEventListener("DOMContentLoaded", () => {
     setDayFilter,
     setTimeRangeFilter,
   };
+
+  window.addEventListener("hashchange", highlightSharedActivity);
 
   // Initialize app
   initializeTheme();
