@@ -339,11 +339,25 @@ document.addEventListener("DOMContentLoaded", () => {
       .join(" ");
   }
 
+  function escapeHtmlAttribute(value) {
+    return String(value).replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+
+      return entities[character];
+    });
+  }
+
   async function copyShareLink(activityName) {
     const shareUrl = buildShareUrl(activityName);
 
     try {
-      if (!navigator.clipboard?.writeText) {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) {
         throw new Error("Clipboard API unavailable");
       }
 
@@ -606,6 +620,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const formattedSchedule = formatSchedule(details);
     const shareUrl = buildShareUrl(name);
     const shareText = buildShareText(name, details);
+    const escapedName = escapeHtmlAttribute(name);
 
     // Create activity tag
     const tagHtml = `
@@ -647,7 +662,9 @@ document.addEventListener("DOMContentLoaded", () => {
               ${
                 currentUser
                   ? `
-                <span class="delete-participant tooltip" data-activity="${name}" data-email="${email}">
+                <span class="delete-participant tooltip" data-activity="${escapedName}" data-email="${escapeHtmlAttribute(
+                    email
+                  )}">
                   ✖
                   <span class="tooltip-text">Unregister this student</span>
                 </span>
@@ -664,7 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ${
           currentUser
             ? `
-          <button class="register-button" data-activity="${name}" ${
+          <button class="register-button" data-activity="${escapedName}" ${
                 isFull ? "disabled" : ""
               }>
             ${isFull ? "Activity Full" : "Register Student"}
@@ -680,7 +697,7 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="activity-card-share">
         <span class="share-label">Share with friends:</span>
         <div class="share-buttons">
-          <button class="share-button share-native-button" data-activity="${name}" type="button">
+          <button class="share-button share-native-button" data-activity="${escapedName}" type="button">
             Share
           </button>
           <a
@@ -703,7 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
           >
             Facebook
           </a>
-          <button class="share-button share-copy-button" data-activity="${name}" type="button">
+          <button class="share-button share-copy-button" data-activity="${escapedName}" type="button">
             Copy Link
           </button>
         </div>
