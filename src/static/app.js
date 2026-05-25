@@ -16,6 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const timeFilters = document.querySelectorAll(".time-filter");
 
   // Authentication elements
+  const themeToggleButton = document.getElementById("theme-toggle");
   const loginButton = document.getElementById("login-button");
   const userInfo = document.getElementById("user-info");
   const displayName = document.getElementById("display-name");
@@ -43,6 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Authentication state
   let currentUser = null;
+  let currentTheme = "light";
+
+  const THEME_STORAGE_KEY = "preferredTheme";
 
   // Time range mappings for the dropdown
   const timeRanges = {
@@ -64,6 +68,22 @@ document.addEventListener("DOMContentLoaded", () => {
     if (activeTimeFilter) {
       currentTimeRange = activeTimeFilter.dataset.time;
     }
+  }
+
+  function applyTheme(theme) {
+    currentTheme = theme === "dark" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", currentTheme);
+
+    const isDarkMode = currentTheme === "dark";
+    themeToggleButton.setAttribute("aria-pressed", isDarkMode.toString());
+    themeToggleButton.querySelector(".theme-toggle-icon").textContent =
+      isDarkMode ? "☀️" : "🌙";
+    themeToggleButton.querySelector(".theme-toggle-label").textContent =
+      isDarkMode ? "Light mode" : "Dark mode";
+  }
+
+  function initializeTheme() {
+    applyTheme(localStorage.getItem(THEME_STORAGE_KEY));
   }
 
   // Function to set day filter
@@ -235,6 +255,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Event listeners for authentication
+  themeToggleButton.addEventListener("click", () => {
+    const nextTheme = currentTheme === "dark" ? "light" : "dark";
+    applyTheme(nextTheme);
+    localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+  });
+
   loginButton.addEventListener("click", openLoginModal);
   logoutButton.addEventListener("click", logout);
   closeLoginModal.addEventListener("click", closeLoginModalHandler);
@@ -864,6 +890,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Initialize app
+  initializeTheme();
   checkAuthentication();
   initializeFilters();
   fetchActivities();
