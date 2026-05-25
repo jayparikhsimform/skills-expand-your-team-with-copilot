@@ -329,9 +329,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function buildShareText(activityName, details) {
-    return `Check out ${activityName} at Mergington High School: ${formatSchedule(
-      details
-    )}. ${details.description}`;
+    return [
+      `Check out ${activityName} at Mergington High School: ${formatSchedule(
+        details
+      )}.`,
+      details.description,
+    ]
+      .filter(Boolean)
+      .join(" ");
   }
 
   async function copyShareLink(activityName) {
